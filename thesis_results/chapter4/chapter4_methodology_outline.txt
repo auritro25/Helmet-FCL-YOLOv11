@@ -1,0 +1,87 @@
+CHAPTER 4
+METHODOLOGY
+
+
+4.1 Overview of Proposed Framework
+
+The proposed framework combines supervised contrastive learning, YOLO11s object detection, and federated learning for privacy-preserving helmet detection.
+
+
+4.2 Dataset Preparation
+
+Describe:
+
+- Dataset collection
+- Image preprocessing
+- Annotation format
+- Three detection classes:
+    Rider
+    Helmet
+    No Helmet
+
+
+4.3 YOLO11s Detection Architecture
+
+Explain:
+
+- Backbone
+- Feature extraction
+- Detection head
+- Bounding box prediction
+
+
+4.4 Supervised Contrastive Feature Learning
+
+Explain:
+
+- Feature representation learning
+- Positive and negative sample relationships
+- Improved feature discrimination
+
+
+4.5 Federated Learning Framework
+
+Describe:
+
+Clients:
+- Client 1
+- Client 2
+- Client 3
+
+Each client trains locally without sharing raw images.
+
+
+4.6 FedAvg Aggregation
+
+Explain:
+
+FedAvg combines client model parameters using weighted averaging.
+
+
+4.7 FedProx Aggregation
+
+Explain:
+
+FedProx introduces a proximal term to reduce local model divergence from the global model.
+
+
+4.8 Training Procedure
+
+Steps:
+
+1. Initialize YOLO11s + SupCon model
+2. Distribute model to clients
+3. Perform local training
+4. Aggregate client parameters
+5. Update global model
+6. Evaluate performance
+
+
+4.9 Evaluation Metrics
+
+Metrics:
+
+- Precision
+- Recall
+- mAP50
+- mAP50-95

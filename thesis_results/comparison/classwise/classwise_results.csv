@@ -1,0 +1,7 @@
+Method,Class,Precision,Recall,mAP50,mAP50-95
+FedAvg,Rider,0.764,0.948,0.906,0.762
+FedAvg,No Helmet,0.829,0.860,0.864,0.472
+FedAvg,Helmet,0.967,0.856,0.935,0.524
+FedProx,Rider,0.766,0.959,0.921,0.778
+FedProx,No Helmet,0.866,0.809,0.873,0.487
+FedProx,Helmet,0.919,0.866,0.939,0.526

@@ -1,0 +1,35 @@
+Helmet-FCL-YOLOv11 Federated Learning Results
+==============================================
+
+Dataset:
+Helmet detection dataset
+Classes:
+- rider
+- helmet
+- no_helmet
+
+
+FEDAVG FINAL RESULT
+===================
+
+Communication rounds: 10
+
+Precision: 0.8531
+Recall: 0.8883
+mAP50: 0.9018
+mAP50-95: 0.5861
+
+
+FEDPROX PRELIMINARY RESULT
+==========================
+
+Communication rounds: 1
+
+Precision: 0.8502
+Recall: 0.8779
+mAP50: 0.9112
+mAP50-95: 0.5970
+
+
+Note:
+FedProx 10-round training will be conducted for final comparison.
