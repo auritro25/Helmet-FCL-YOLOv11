@@ -1,8 +1,10 @@
-from ultralytics.models.yolo.detect import DetectionTrainer
+from ultralytics.models.yolo.detect.train import DetectionTrainer
 import torch
 
 
+
 class FedProxTrainer(DetectionTrainer):
+
 
     def __init__(
         self,
@@ -11,14 +13,16 @@ class FedProxTrainer(DetectionTrainer):
         _callbacks=None
     ):
 
+
         if overrides is None:
             overrides = {}
 
-        # save FedProx parameters
+
         self.global_weights = overrides.pop(
             "global_weights",
             None
         )
+
 
         self.mu = overrides.pop(
             "mu",
@@ -26,61 +30,70 @@ class FedProxTrainer(DetectionTrainer):
         )
 
 
-        # IMPORTANT FIX
-        if cfg is None:
-            cfg = {}
-
-
         super().__init__(
-            cfg=cfg,
-            overrides=overrides,
-            _callbacks=_callbacks
+            cfg,
+            overrides,
+            _callbacks
         )
 
 
-    def criterion(
+
+    def compute_loss(
         self,
-        preds,
+        model,
         batch
     ):
 
-        # YOLO original loss
-        loss, loss_items = super().criterion(
-            preds,
+
+        loss, loss_items = super().compute_loss(
+            model,
             batch
         )
 
 
-        prox_loss = torch.tensor(
-            0.0,
+        if self.global_weights is None:
+
+            return loss, loss_items
+
+
+
+        prox_loss = torch.zeros(
+            1,
             device=self.device
         )
 
 
-        if self.global_weights is not None:
-
-            for name, param in self.model.named_parameters():
-
-                if name in self.global_weights:
-
-                    global_param = (
-                        self.global_weights[name]
-                        .to(self.device)
-                    )
-
-                    prox_loss += torch.sum(
-                        (param - global_param) ** 2
-                    )
+        for name, param in model.named_parameters():
 
 
-        total_loss = (
+            if name in self.global_weights:
+
+
+                global_param = (
+                    self.global_weights[name]
+                    .to(self.device)
+                )
+
+
+                prox_loss += torch.sum(
+                    (param - global_param) ** 2
+                )
+
+
+
+        loss = (
+
             loss
+
             +
-            (self.mu / 2) * prox_loss
+
+            (self.mu / 2)
+
+            *
+
+            prox_loss
+
         )
 
 
-        return (
-            total_loss,
-            loss_items
-        )
+        return loss, loss_items

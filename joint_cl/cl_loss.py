@@ -3,72 +3,89 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class SupConLoss(nn.Module):
 
-    def __init__(self, temperature=0.07):
+class NTXentLoss(nn.Module):
+
+    def __init__(
+        self,
+        temperature=0.07
+    ):
+
         super().__init__()
 
         self.temperature = temperature
 
 
-    def forward(self, features, labels):
+    def forward(
+        self,
+        z1,
+        z2
+    ):
 
-        features = F.normalize(
-            features,
+
+        batch_size = z1.size(0)
+
+
+        z1 = F.normalize(
+            z1,
             dim=1
         )
 
+        z2 = F.normalize(
+            z2,
+            dim=1
+        )
+
+
+        representations = torch.cat(
+            [
+                z1,
+                z2
+            ],
+            dim=0
+        )
+
+
         similarity = torch.matmul(
-            features,
-            features.T
-        ) / self.temperature
-
-
-        labels = labels.view(-1,1)
-
-        mask = torch.eq(
-            labels,
-            labels.T
-        ).float().to(features.device)
-
-
-        mask.fill_diagonal_(0)
-
-
-        valid = mask.sum(1)>0
-
-
-        if valid.sum()==0:
-            return torch.tensor(
-                0.0,
-                device=features.device,
-                requires_grad=True
-            )
-
-
-        similarity = similarity[valid][:,valid]
-
-        mask = mask[valid][:,valid]
-
-
-        exp_logits = torch.exp(
-            similarity
+            representations,
+            representations.T
         )
 
 
-        log_prob = similarity - torch.log(
-            exp_logits.sum(
-                dim=1,
-                keepdim=True
-            )
+        similarity /= self.temperature
+
+
+        mask = torch.eye(
+            2*batch_size,
+            device=z1.device
+        ).bool()
+
+
+        similarity.masked_fill_(
+            mask,
+            -9e15
         )
 
 
-        loss = (
-            -(mask*log_prob).sum(1)
-            /
-            mask.sum(1)
-        ).mean()
+        positives = torch.cat(
+            [
+                torch.arange(
+                    batch_size,
+                    2*batch_size
+                ),
+
+                torch.arange(
+                    0,
+                    batch_size
+                )
+            ]
+        ).to(z1.device)
+
+
+        loss = F.cross_entropy(
+            similarity,
+            positives
+        )
 
 
         return loss

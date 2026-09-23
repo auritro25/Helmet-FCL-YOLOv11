@@ -1,6 +1,7 @@
 from ultralytics import YOLO
 import torch
-import os
+from pathlib import Path
+
 from ultralytics.nn.tasks import DetectionModel
 
 
@@ -19,24 +20,48 @@ CLIENTS = [
 ]
 
 
-ROUNDS = 10
+ROUNDS = 5
 LOCAL_EPOCHS = 5
 
 
 
-def train_client(client, model_path, round_no):
+# Number of training images per client
+# Generated from Dirichlet split
+CLIENT_SIZES = {
+
+    "client1": 1075,
+
+    "client2": 2874,
+
+    "client3": 1381
+
+}
+
+
+
+def train_client(
+        client,
+        model_path,
+        round_no
+):
+
 
     print(
         f"\nTraining {client} - Round {round_no}"
     )
 
 
-    model = YOLO(model_path)
+    model = YOLO(
+        model_path
+    )
 
 
     model.train(
 
-        data=f"federated/clients/{client}/data.yaml",
+        data=(
+            f"federated/clients/"
+            f"{client}/data.yaml"
+        ),
 
         epochs=LOCAL_EPOCHS,
 
@@ -58,13 +83,16 @@ def train_client(client, model_path, round_no):
 
 
     return (
+
         f"runs/detect/runs/fl_final/"
         f"{client}_round_{round_no}/weights/best.pt"
+
     )
 
 
 
 def load_weights(path):
+
 
     checkpoint = torch.load(
 
@@ -81,24 +109,56 @@ def load_weights(path):
 
 
 
-def fedavg(weight_list):
+# Weighted FedAvg
+
+def fedavg(
+        weight_list,
+        client_sizes
+):
+
 
     avg = {}
 
 
+    total_samples = sum(
+        client_sizes
+    )
+
+
     for key in weight_list[0]:
 
-        avg[key] = sum(
-            w[key]
-            for w in weight_list
-        ) / len(weight_list)
+
+        weighted_sum = 0
+
+
+        for weights, size in zip(
+            weight_list,
+            client_sizes
+        ):
+
+
+            weighted_sum += (
+                weights[key]
+                *
+                (size / total_samples)
+            )
+
+
+
+        avg[key] = weighted_sum
+
 
 
     return avg
 
 
 
-def save_checkpoint(state_dict, round_no):
+
+def save_checkpoint(
+        state_dict,
+        round_no
+):
+
 
     save_path = (
 
@@ -129,12 +189,12 @@ def save_checkpoint(state_dict, round_no):
 
 
 
-def convert_to_yolo_checkpoint(state_dict, round_no):
 
-    """
-    Create temporary YOLO-loadable model
-    for next round
-    """
+def convert_to_yolo_checkpoint(
+        state_dict,
+        round_no
+):
+
 
     base = YOLO(
         BASE_MODEL
@@ -154,10 +214,13 @@ def convert_to_yolo_checkpoint(state_dict, round_no):
     )
 
 
-    base.save(path)
+    base.save(
+        path
+    )
 
 
     return path
+
 
 
 
@@ -167,7 +230,11 @@ def main():
     global_model = BASE_MODEL
 
 
-    for r in range(1, ROUNDS + 1):
+
+    for r in range(
+        1,
+        ROUNDS + 1
+    ):
 
 
         print(
@@ -183,7 +250,8 @@ def main():
         )
 
 
-        client_models=[]
+
+        client_models = []
 
 
 
@@ -207,10 +275,13 @@ def main():
 
 
 
-        weights=[]
+
+        weights = []
+
 
 
         for model in client_models:
+
 
             weights.append(
                 load_weights(model)
@@ -218,21 +289,45 @@ def main():
 
 
 
+        sizes = [
+
+            CLIENT_SIZES[c]
+
+            for c in CLIENTS
+
+        ]
+
+
+
         global_weights = fedavg(
-            weights
+
+            weights,
+
+            sizes
+
         )
+
 
 
         save_checkpoint(
+
             global_weights,
+
             r
+
         )
+
 
 
         global_model = convert_to_yolo_checkpoint(
+
             global_weights,
+
             r
+
         )
+
+
 
 
 

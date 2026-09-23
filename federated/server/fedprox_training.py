@@ -1,6 +1,21 @@
-from ultralytics import YOLO
+from pathlib import Path
+import sys
 import torch
+
+from ultralytics import YOLO
 from ultralytics.nn.tasks import DetectionModel
+
+
+ROOT = Path(__file__).resolve().parents[2]
+
+sys.path.insert(
+    0,
+    str(ROOT)
+)
+
+
+from federated.fedprox.manual_fedprox import FedProxTrainer
+
 
 
 torch.serialization.add_safe_globals(
@@ -8,85 +23,137 @@ torch.serialization.add_safe_globals(
 )
 
 
+
 CLIENTS = [
+
     "client1",
     "client2",
     "client3"
+
 ]
 
 
-ROUNDS = 10
+ROUNDS = 5
+
+
 LOCAL_EPOCHS = 5
+
 
 MU = 0.01
 
 
 
-def load_weights(path):
+CLIENT_SIZES = {
 
-    ckpt = torch.load(
-        path,
-        map_location="cpu",
-        weights_only=False
-    )
+    "client1": 1075,
 
-    return ckpt["model"].state_dict()
+    "client2": 2874,
+
+    "client3": 1381
+
+}
 
 
 
-def fedprox_aggregate(
-    local_weights,
-    global_weights
+BASE_MODEL = (
+
+    "models/phase2_supcon_best.pt"
+
+)
+
+
+
+
+
+def aggregate(
+
+        weights,
+
+        sizes
+
 ):
 
-    new_weights = {}
+
+    total = sum(sizes)
 
 
-    for key in local_weights[0]:
-
-        avg = sum(
-            w[key]
-            for w in local_weights
-        ) / len(local_weights)
+    result = {}
 
 
-        # FedProx correction
-        if global_weights is not None:
 
-            avg = avg + MU * (
-                global_weights[key] - avg
+    for key in weights[0]:
+
+
+        result[key] = sum(
+
+            w[key] * (s / total)
+
+            for w, s in zip(
+
+                weights,
+
+                sizes
+
             )
 
-
-        new_weights[key] = avg
-
-
-    return new_weights
+        )
 
 
+    return result
 
-def save_checkpoint(
-    weights,
-    round_no
+
+
+
+
+def save_global(
+
+        weights,
+
+        r
+
 ):
 
-    path = (
-        f"federated/server/"
-        f"global_fedprox_round_{round_no}.pt"
+
+    Path(
+
+        "federated/server"
+
+    ).mkdir(
+
+        exist_ok=True
+
     )
+
+
+
+    path = (
+
+        f"federated/server/"
+        f"global_fedprox_round_{r}.pt"
+
+    )
+
 
 
     torch.save(
+
         {
+
             "model": weights
+
         },
+
         path
+
     )
 
 
     print(
+
         "Saved:",
+
         path
+
     )
 
 
@@ -94,81 +161,145 @@ def save_checkpoint(
 
 
 
+
+
 def main():
 
 
-    # Continue from completed Round 1
-    global_model = (
-        "federated/server/"
-        "yolo_fedprox_round_1.pt"
-    )
+    global_model = BASE_MODEL
+
 
 
     for r in range(
-        2,
+
+        1,
+
         ROUNDS + 1
+
     ):
 
 
-        print(
-            "\n================"
-        )
+
+        print()
+
+        print("================")
 
         print(
+
             f"FEDPROX ROUND {r}"
+
         )
 
-        print(
-            "================"
+        print("================")
+
+
+
+        base = YOLO(
+
+            global_model
+
         )
 
 
-        # Load previous global weights
 
-        ckpt = torch.load(
-            global_model,
-            map_location="cpu",
-            weights_only=False
-        )
+        global_weights = {
 
 
-        if hasattr(
-            ckpt["model"],
-            "state_dict"
-        ):
+            k: v.detach().clone()
 
-            global_weights = (
-                ckpt["model"]
-                .state_dict()
-            )
 
-        else:
+            for k, v in base.model.state_dict().items()
 
-            global_weights = ckpt["model"]
+
+        }
 
 
 
-        client_models = []
+        client_weights = []
+
+
+
 
 
         for client in CLIENTS:
 
 
+
+            print()
+
             print(
-                f"\nTraining {client}"
+
+                "Training",
+
+                client
+
             )
+
 
 
             model = YOLO(
+
                 global_model
+
             )
+
+
+
+
+
+            def add_fedprox(trainer):
+
+
+                trainer.global_weights = {
+
+
+                    k: v.detach().clone()
+
+
+                    for k, v in global_weights.items()
+
+
+                }
+
+
+
+                trainer.mu = MU
+
+
+
+                print(
+
+                    "FedProx enabled:",
+
+                    trainer.mu
+
+                )
+
+
+
+
+
+            model.add_callback(
+
+                "on_train_start",
+
+                add_fedprox
+
+            )
+
+
+
 
 
             model.train(
 
+                trainer=FedProxTrainer,
+
                 data=(
+
                     f"federated/clients/"
                     f"{client}/data.yaml"
+
                 ),
 
                 epochs=LOCAL_EPOCHS,
@@ -181,7 +312,7 @@ def main():
 
                 workers=0,
 
-                project="runs/fedprox",
+                project="runs/fedprox_manual",
 
                 name=f"{client}_round_{r}",
 
@@ -190,42 +321,68 @@ def main():
             )
 
 
-            client_models.append(
 
-                f"runs/detect/runs/fedprox/"
-                f"{client}_round_{r}/weights/best.pt"
+            client_weights.append(
+
+                {
+
+                    k: v.detach().clone()
+
+                    for k, v in model.model.state_dict().items()
+
+                }
 
             )
 
 
 
-        local_weights = []
 
 
-        for path in client_models:
+        sizes = [
 
-            local_weights.append(
-                load_weights(path)
-            )
+            CLIENT_SIZES[c]
+
+            for c in CLIENTS
+
+        ]
 
 
 
-        new_weights = fedprox_aggregate(
 
-            local_weights,
 
-            global_weights
+        new_global = aggregate(
+
+            client_weights,
+
+            sizes
 
         )
 
 
-        global_model = save_checkpoint(
 
-            new_weights,
+
+
+        global_model = save_global(
+
+            new_global,
 
             r
 
         )
+
+
+
+
+
+    print()
+
+    print(
+
+        "FEDPROX COMPLETE"
+
+    )
+
+
 
 
 

@@ -1,23 +1,49 @@
-from ultralytics.models.yolo.detect import DetectionTrainer
-
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
-from cl_loss import SupConLoss
+from ultralytics import YOLO
+
+from .cl_loss import NTXentLoss
 
 
 
-class ProjectionHead(nn.Module):
+class YOLOCLTrainer:
 
-    def __init__(self, input_dim):
 
-        super().__init__()
+    def __init__(
+        self,
+        model_path="yolo11s.pt",
+        proj_dim=128,
+        temperature=0.07
+    ):
 
-        self.net = nn.Sequential(
+
+        self.yolo = YOLO(
+            model_path
+        )
+
+
+        self.model = self.yolo.model
+
+
+        self.features = None
+
+
+        # Hook a backbone feature layer
+        # YOLO11s layers: use layer before Detect head
+
+        target_layer = self.model.model[-2]
+
+
+        target_layer.register_forward_hook(
+            self.save_features
+        )
+
+
+        self.projector = nn.Sequential(
 
             nn.Linear(
-                input_dim,
+                512,
                 256
             ),
 
@@ -25,57 +51,19 @@ class ProjectionHead(nn.Module):
 
             nn.Linear(
                 256,
-                128
+                proj_dim
             )
+
         )
 
 
-    def forward(self, x):
-
-        return F.normalize(
-            self.net(x),
-            dim=1
+        self.criterion = NTXentLoss(
+            temperature
         )
 
 
 
-class YOLOCLTrainer(DetectionTrainer):
-
-
-    def setup_model(self):
-
-        super().setup_model()
-
-        self.features = None
-
-        self.supcon = SupConLoss().to(
-            self.device
-        )
-
-        self.projection = None
-
-        print("Model loaded")
-
-
-
-    def _setup_train(self):
-
-        super()._setup_train()
-
-
-        print("Attaching feature hook...")
-
-
-        self.model.model[-2].register_forward_hook(
-            self.feature_hook
-        )
-
-
-        print("Feature hook attached")
-
-
-
-    def feature_hook(
+    def save_features(
         self,
         module,
         input,
@@ -86,97 +74,79 @@ class YOLOCLTrainer(DetectionTrainer):
 
 
 
-    def get_embedding(self, feature):
+    def forward_features(
+        self,
+        x
+    ):
 
 
-        if len(feature.shape) == 4:
-
-            feature = torch.mean(
-                feature,
-                dim=[2,3]
-            )
+        self.features = None
 
 
-        if self.projection is None:
+        # Run complete YOLO forward
+        # Hook captures feature map
 
-            self.projection = ProjectionHead(
-                feature.shape[1]
-            ).to(
-                self.device
-            )
-
-
-            print(
-                "Projection dimension:",
-                feature.shape[1]
-            )
-
-
-        return self.projection(
-            feature
+        _ = self.model(
+            x
         )
 
 
+        features = self.features
 
-    def criterion(
+
+        if isinstance(
+            features,
+            list
+        ):
+
+            features = features[-1]
+
+
+        # Global average pooling
+
+        features = torch.mean(
+            features,
+            dim=(2,3)
+        )
+
+
+        return features
+
+
+
+    def training_step(
         self,
-        preds,
         batch
     ):
 
 
-        yolo_loss = super().criterion(
-            preds,
-            batch
+        view1, view2, _ = batch
+
+
+        z1 = self.forward_features(
+            view1
         )
 
 
-        contrastive_loss = torch.tensor(
-            0.0,
-            device=self.device
+        z2 = self.forward_features(
+            view2
         )
 
 
-        if self.features is not None:
-
-
-            embedding = self.get_embedding(
-                self.features
-            )
-
-
-            labels = batch["cls"]
-
-
-            labels = labels.reshape(
-                -1
-            )
-
-
-            labels = labels[:embedding.shape[0]]
-
-
-            contrastive_loss = self.supcon(
-                embedding,
-                labels
-            )
-
-
-        total_loss = (
-
-            yolo_loss[0]
-
-            +
-
-            0.1 * contrastive_loss
-
+        z1 = self.projector(
+            z1
         )
 
 
-        return (
-
-            total_loss,
-
-            yolo_loss[1]
-
+        z2 = self.projector(
+            z2
         )
+
+
+        loss = self.criterion(
+            z1,
+            z2
+        )
+
+
+        return loss
