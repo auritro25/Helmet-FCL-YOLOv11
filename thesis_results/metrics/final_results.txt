@@ -1,0 +1,23 @@
+
+Final Model Evaluation Results
+
+Centralized YOLOv11:
+Precision: 0.858
+Recall: 0.868
+mAP50: 0.901
+mAP50-95: 0.630
+
+
+FedAvg:
+Precision: 0.868
+Recall: 0.851
+mAP50: 0.897
+mAP50-95: 0.625
+
+
+FedProx:
+Precision: 0.852
+Recall: 0.859
+mAP50: 0.887
+mAP50-95: 0.620
+

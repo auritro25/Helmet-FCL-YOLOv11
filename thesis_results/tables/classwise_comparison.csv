@@ -1,0 +1,10 @@
+Model,Class,Precision,Recall,mAP50,mAP50-95
+Centralized YOLOv11,rider,0.811,0.945,0.935,0.816
+Centralized YOLOv11,no_helmet,0.865,0.796,0.868,0.528
+Centralized YOLOv11,helmet,0.899,0.862,0.901,0.545
+FedAvg,rider,0.783,0.936,0.922,0.803
+FedAvg,no_helmet,0.901,0.761,0.858,0.516
+FedAvg,helmet,0.918,0.858,0.91,0.557
+FedProx,rider,0.787,0.943,0.914,0.799
+FedProx,no_helmet,0.874,0.773,0.854,0.511
+FedProx,helmet,0.896,0.862,0.893,0.55

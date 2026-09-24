@@ -1,0 +1,4 @@
+Model,FL,FedProx,FCL
+Centralized YOLOv11,No,No,No
+FedAvg,Yes,No,No
+FedProx,Yes,Yes,No

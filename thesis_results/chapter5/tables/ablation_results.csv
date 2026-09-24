@@ -1,4 +1,0 @@
-Experiment,Description,Precision,Recall,mAP50,mAP50-95
-A,SupCon YOLO11s Centralized,0.852,0.881,0.918,0.604
-B,FedAvg + SupCon YOLO11s (10 rounds),0.853,0.888,0.902,0.586
-C,FedProx + SupCon YOLO11s (1 round),0.850,0.878,0.911,0.597

@@ -1,0 +1,4 @@
+Configuration,Federated Learning,Proximal Regularization,mAP@0.5,mAP@0.5:0.95
+Centralized YOLOv11,No,No,0.901,0.63
+FedAvg,Yes,No,0.897,0.625
+FedProx,Yes,Yes,0.887,0.62

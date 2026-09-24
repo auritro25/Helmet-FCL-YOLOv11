@@ -33,7 +33,9 @@ CLIENTS = [
 ]
 
 
-ROUNDS = 5
+START_ROUND = 2
+
+END_ROUND = 5
 
 
 LOCAL_EPOCHS = 5
@@ -62,16 +64,19 @@ BASE_MODEL = (
 )
 
 
+# Existing global model from completed round 1
+
+GLOBAL_MODEL = (
+
+    "federated/server/global_fedprox_round_1.pt"
+
+)
 
 
 
-def aggregate(
 
-        weights,
 
-        sizes
-
-):
+def aggregate(weights, sizes):
 
 
     total = sum(sizes)
@@ -105,13 +110,7 @@ def aggregate(
 
 
 
-def save_global(
-
-        weights,
-
-        r
-
-):
+def save_global(weights, r):
 
 
     Path(
@@ -123,7 +122,6 @@ def save_global(
         exist_ok=True
 
     )
-
 
 
     path = (
@@ -163,18 +161,55 @@ def save_global(
 
 
 
+def load_global_model(path):
+
+
+    model = YOLO(
+
+        BASE_MODEL
+
+    )
+
+
+
+    ckpt = torch.load(
+
+        path,
+
+        map_location="cpu",
+
+        weights_only=False
+
+    )
+
+
+
+    model.model.load_state_dict(
+
+        ckpt["model"]
+
+    )
+
+
+
+    return model
+
+
+
+
+
 def main():
 
 
-    global_model = BASE_MODEL
+    global_model_path = GLOBAL_MODEL
 
 
 
     for r in range(
 
-        1,
+        START_ROUND,
 
-        ROUNDS + 1
+        END_ROUND + 1
 
     ):
 
@@ -194,9 +229,11 @@ def main():
 
 
 
-        base = YOLO(
 
-            global_model
+
+        base = load_global_model(
+
+            global_model_path
 
         )
 
@@ -208,7 +245,7 @@ def main():
             k: v.detach().clone()
 
 
-            for k, v in base.model.state_dict().items()
+            for k,v in base.model.state_dict().items()
 
 
         }
@@ -237,9 +274,9 @@ def main():
 
 
 
-            model = YOLO(
+            model = load_global_model(
 
-                global_model
+                global_model_path
 
             )
 
@@ -256,7 +293,7 @@ def main():
                     k: v.detach().clone()
 
 
-                    for k, v in global_weights.items()
+                    for k,v in global_weights.items()
 
 
                 }
@@ -269,9 +306,7 @@ def main():
 
                 print(
 
-                    "FedProx enabled:",
-
-                    trainer.mu
+                    "FedProx activated"
 
                 )
 
@@ -328,7 +363,7 @@ def main():
 
                     k: v.detach().clone()
 
-                    for k, v in model.model.state_dict().items()
+                    for k,v in model.model.state_dict().items()
 
                 }
 
@@ -348,8 +383,6 @@ def main():
 
 
 
-
-
         new_global = aggregate(
 
             client_weights,
@@ -360,9 +393,7 @@ def main():
 
 
 
-
-
-        global_model = save_global(
+        global_model_path = save_global(
 
             new_global,
 
@@ -378,7 +409,7 @@ def main():
 
     print(
 
-        "FEDPROX COMPLETE"
+        "FEDPROX RESUME COMPLETE"
 
     )
 

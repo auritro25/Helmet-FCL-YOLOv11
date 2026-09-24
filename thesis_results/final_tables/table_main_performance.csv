@@ -1,0 +1,4 @@
+Model,Precision,Recall,mAP@0.5,mAP@0.5:0.95
+Centralized YOLOv11,0.858,0.868,0.901,0.63
+FedAvg,0.868,0.851,0.897,0.625
+FedProx,0.852,0.859,0.887,0.62

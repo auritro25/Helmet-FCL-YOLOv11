@@ -1,0 +1,10 @@
+Model,Class,Recall,Observation
+Centralized YOLOv11,Rider,0.945,High detection sensitivity
+Centralized YOLOv11,No Helmet,0.796,More difficult class due to small visual region
+Centralized YOLOv11,Helmet,0.862,Good detection performance
+FedAvg,Rider,Extract from validation,Federated detection
+FedAvg,No Helmet,Extract from validation,Violation detection
+FedAvg,Helmet,Extract from validation,Helmet recognition
+FedProx,Rider,Extract from validation,Federated detection
+FedProx,No Helmet,Extract from validation,Violation detection
+FedProx,Helmet,Extract from validation,Helmet recognition

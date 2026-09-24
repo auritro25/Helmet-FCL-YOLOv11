@@ -17,78 +17,43 @@ class FedProxTrainer(DetectionTrainer):
     ):
 
 
-        if cfg is None:
-
-            cfg = get_cfg()
-
-
-
-        if overrides is None:
-
-            overrides = {}
-
-
-
-        super().__init__(
-
-            cfg=cfg,
-
-            overrides=overrides,
-
-            _callbacks=_callbacks
-
-        )
-
-
-
         self.global_weights = None
-
         self.mu = 0.01
 
 
+        if cfg is None:
+            cfg = get_cfg()
 
 
-
-    def compute_loss(
-
-        self,
-
-        model,
-
-        batch,
-
-        preds=None
-
-    ):
+        if overrides is None:
+            overrides = {}
 
 
-        loss, loss_items = super().compute_loss(
-
-            model,
-
-            batch,
-
-            preds
-
+        super().__init__(
+            cfg=cfg,
+            overrides=overrides,
+            _callbacks=_callbacks
         )
 
 
 
-        prox = torch.zeros(
-
-            1,
-
-            device=self.device
-
-        )
-
+    def optimizer_step(self):
 
 
         if self.global_weights is not None:
 
 
+            prox_loss = torch.zeros(
 
-            for name,param in model.named_parameters():
+                1,
+
+                device=self.device
+
+            )
+
+
+
+            for name, param in self.model.named_parameters():
 
 
                 if name in self.global_weights:
@@ -103,7 +68,7 @@ class FedProxTrainer(DetectionTrainer):
                     )
 
 
-                    prox += torch.sum(
+                    prox_loss += torch.sum(
 
                         (
 
@@ -115,30 +80,32 @@ class FedProxTrainer(DetectionTrainer):
 
                         )
 
-                        **2
+                        ** 2
 
                     )
 
 
 
-        fedprox_loss = (
-
-            loss
-
-            +
-
-            (
+            fedprox_term = (
 
                 self.mu / 2
 
+            ) * prox_loss
+
+
+
+            print(
+
+                "FedProx penalty:",
+
+                fedprox_term.item()
+
             )
 
-            *
 
-            prox
 
-        )
+            fedprox_term.backward()
 
 
 
-        return fedprox_loss, loss_items
+        super().optimizer_step()
